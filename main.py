@@ -1,23 +1,15 @@
 """
-Discord Duplicate Image Detection Bot - ASCII Compatible Version
+Discord Duplicate Image Detection Bot - Production Version
 """
 import os
 import asyncio
 import logging
 import sys
-import time
+from typing import Optional
 
-# Ensure UTF-8 encoding for Windows
-if sys.platform == "win32":
-    try:
-        # Try to set console to UTF-8
-        os.environ['PYTHONIOENCODING'] = 'utf-8'
-        sys.stdout.reconfigure(encoding='utf-8') if hasattr(sys.stdout, 'reconfigure') else None
-        sys.stderr.reconfigure(encoding='utf-8') if hasattr(sys.stderr, 'reconfigure') else None
-    except:
-        # If reconfigure isn't available, use this fallback
-        sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
-        sys.stderr = open(sys.stderr.fileno(), mode='w', encoding='utf-8', buffering=1)
+# First, load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
 
 import discord
 from discord.ext import commands
@@ -65,7 +57,7 @@ def setup_logging():
     # ASCII-only welcome message
     logger = logging.getLogger("DuplicateDetector")
     logger.info("=" * 70)
-    logger.info("  Discord Duplicate Image Detection Bot - ASCII Compatible Version")
+    logger.info("  Discord Duplicate Image Detection Bot - Production Version")
     logger.info("  Starting up with OCR and advanced features...")
     logger.info("=" * 70)
     
@@ -221,7 +213,7 @@ async def shutdown(bot: commands.Bot):
 def main():
     """Main entry point with proper error handling."""
     print("\n" + "=" * 70)
-    print("  Discord Duplicate Image Detection Bot - ASCII Compatible Version")
+    print("  Discord Duplicate Image Detection Bot - Production Version")
     print("  Starting up with OCR and advanced features...")
     print("=" * 70 + "\n")
     
