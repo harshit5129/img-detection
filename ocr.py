@@ -1,6 +1,4 @@
-"""
-OCR processing module for the duplicate detection bot.
-"""
+
 import io
 import logging
 import os
@@ -8,7 +6,7 @@ import re
 from typing import Dict, Optional
 import asyncio
 import aiohttp
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
 from discord import Attachment
 

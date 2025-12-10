@@ -30,6 +30,7 @@ from db import (
     get_image_by_hash,
     get_similar_ocr_text,
     quarantine_message,
+    get_log_channel,
 )
 from config import (
     ensure_guild_config, 
@@ -70,13 +71,41 @@ class ImageProcessingError(Exception):
     """Custom exception for image processing errors."""
     pass
 
-def is_user_whitelisted(guild_id: int, user_id: int) -> bool:
-    """Check if user is whitelisted."""
+async def is_user_whitelisted(guild_id: int, user_id: int, guild: discord.Guild = None, member: discord.Member = None) -> bool:
+    """Check if user is whitelisted (manual or automatic)."""
     try:
         cfg = guild_data.get(guild_id, {}).get("config", {})
         whitelist = cfg.get("user_whitelist", set())
-        return user_id in whitelist
-    except Exception:
+        
+        # Check manual whitelist
+        if user_id in whitelist:
+            return True
+        
+        # Check auto-whitelist if guild info is available
+        if guild:
+            from db import get_db
+            db = get_db()
+            config = await db.guild_config.find_one({"guild_id": guild_id})
+            auto_wl = config.get("auto_whitelist", {}) if config else {}
+            
+            # Role-based auto-whitelist
+            role_id = auto_wl.get("role_id")
+            if role_id and member:
+                if any(role.id == role_id for role in member.roles):
+                    logger.debug(f"User {user_id} auto-whitelisted by role")
+                    return True
+            
+            # Trust-based auto-whitelist
+            trust_threshold = auto_wl.get("trust_threshold")
+            if trust_threshold:
+                stats = await get_user_stats(guild_id, user_id)
+                if stats and stats.get("unique_count", 0) >= trust_threshold:
+                    logger.debug(f"User {user_id} auto-whitelisted by trust ({stats.get('unique_count')} unique posts)")
+                    return True
+        
+        return False
+    except Exception as e:
+        logger.error(f"Error checking whitelist: {e}")
         return False
 
 def is_channel_blacklisted(guild_id: int, channel_id: int) -> bool:
@@ -601,7 +630,8 @@ async def process_message_for_duplicates(
         return
     
     # Check if user is whitelisted
-    if is_user_whitelisted(guild_id, message.author.id):
+    member = message.author if isinstance(message.author, discord.Member) else None
+    if await is_user_whitelisted(guild_id, message.author.id, message.guild, member):
         logger.debug(f"User {message.author.id} is whitelisted, skipping")
         return
     

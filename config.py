@@ -85,70 +85,111 @@ async def ensure_guild_config(guild_id: int) -> None:
             guild_data[guild_id] = {"config": _create_default_config()}
 
 def _parse_guild_config_row(row: Any) -> Dict[str, Any]:
-    """Parse database row into configuration dict."""
+    """Parse database document into configuration dict."""
     try:
-        # Parse JSON fields with fallbacks
-        whitelist = set(json.loads(row["whitelist"])) if row["whitelist"] else set()
-        blacklist = set(json.loads(row["blacklist"])) if row["blacklist"] else set()
-        user_whitelist = set(json.loads(row["user_whitelist"])) if row["user_whitelist"] else set()
-        channel_thresholds = json.loads(row["channel_thresholds"]) if row["channel_thresholds"] else {}
-        notification_settings = json.loads(row["notification_settings"]) if row["notification_settings"] else {}
+        # MongoDB stores arrays and objects natively, no JSON parsing needed
+        # Handle both old SQLite format (strings) and new MongoDB format (native types)
+        
+        # Parse whitelist
+        if isinstance(row.get("whitelist"), str):
+            whitelist = set(json.loads(row["whitelist"])) if row["whitelist"] else set()
+        else:
+            whitelist = set(row.get("whitelist", []))
+        
+        # Parse blacklist
+        if isinstance(row.get("blacklist"), str):
+            blacklist = set(json.loads(row["blacklist"])) if row["blacklist"] else set()
+        else:
+            blacklist = set(row.get("blacklist", []))
+        
+        # Parse user_whitelist
+        if isinstance(row.get("user_whitelist"), str):
+            user_whitelist = set(json.loads(row["user_whitelist"])) if row["user_whitelist"] else set()
+        else:
+            user_whitelist = set(row.get("user_whitelist", []))
+        
+        # Parse channel_thresholds
+        if isinstance(row.get("channel_thresholds"), str):
+            channel_thresholds = json.loads(row["channel_thresholds"]) if row["channel_thresholds"] else {}
+        else:
+            channel_thresholds = row.get("channel_thresholds", {})
+        
+        # Parse notification_settings
+        if isinstance(row.get("notification_settings"), str):
+            notification_settings = json.loads(row["notification_settings"]) if row["notification_settings"] else {}
+        else:
+            notification_settings = row.get("notification_settings", {})
         
         # Parse scalar fields
         hash_threshold = (
             int(row["hash_threshold"])
-            if row["hash_threshold"] is not None
+            if row.get("hash_threshold") is not None
             else HASH_THRESHOLD_DEFAULT
         )
         ocr_threshold = (
             int(row["ocr_threshold"])
-            if row["ocr_threshold"] is not None
+            if row.get("ocr_threshold") is not None
             else OCR_THRESHOLD_DEFAULT
         )
         auto_delete = (
             bool(row["auto_delete"])
-            if row["auto_delete"] is not None
+            if row.get("auto_delete") is not None
             else AUTO_DELETE_DEFAULT
         )
         ocr_enabled = (
             bool(row["ocr_enabled"])
-            if row["ocr_enabled"] is not None
+            if row.get("ocr_enabled") is not None
             else OCR_ENABLED_DEFAULT
         )
         
         # Parse reaction settings with merge
         reactions = default_reaction_settings()
-        if row["reaction_settings"]:
+        reaction_data = row.get("reaction_settings")
+        if reaction_data:
             try:
-                loaded = json.loads(row["reaction_settings"])
+                if isinstance(reaction_data, str):
+                    loaded = json.loads(reaction_data)
+                else:
+                    loaded = reaction_data
+                    
                 if isinstance(loaded, dict):
                     for scope, cfg in loaded.items():
                         if scope in reactions and isinstance(cfg, dict):
                             reactions[scope].update(cfg)
                         elif isinstance(cfg, dict):
                             reactions[scope] = cfg
-            except json.JSONDecodeError as e:
-                logger.warning(f"Invalid reaction_settings JSON: {e}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Invalid reaction_settings: {e}")
         
         # Parse warning configuration
         warnings = default_warning_config()
-        if row["warning_config"]:
+        warning_data = row.get("warning_config")
+        if warning_data:
             try:
-                loaded = json.loads(row["warning_config"])
+                if isinstance(warning_data, str):
+                    loaded = json.loads(warning_data)
+                else:
+                    loaded = warning_data
+                    
                 if isinstance(loaded, dict):
                     warnings.update(loaded)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Invalid warning_config JSON: {e}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Invalid warning_config: {e}")
         
         # Parse quarantine configuration
         quarantine = default_quarantine_config()
-        if row["quarantine_config"]:
+        quarantine_data = row.get("quarantine_config")
+        if quarantine_data:
             try:
-                loaded = json.loads(row["quarantine_config"])
+                if isinstance(quarantine_data, str):
+                    loaded = json.loads(quarantine_data)
+                else:
+                    loaded = quarantine_data
+                    
                 if isinstance(loaded, dict):
                     quarantine.update(loaded)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Invalid quarantine_config JSON: {e}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Invalid quarantine_config: {e}")
         
         return {
             "whitelist": whitelist,

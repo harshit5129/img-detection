@@ -16,7 +16,9 @@ from db import (
     clear_user_warnings,
     get_guild_stats,
     get_user_stats,
-    get_leaderboard
+    get_leaderboard,
+    set_log_channel,
+    get_log_channel,
 )
 
 logger = logging.getLogger("DuplicateDetector")
@@ -304,6 +306,9 @@ def register_admin_commands(bot: commands.Bot) -> None:
                     break
             
             if existing_channel:
+                # Save channel ID to database
+                await set_log_channel(interaction.guild_id, existing_channel.id)
+                
                 embed = discord.Embed(
                     title="✅ Log Channel Already Exists",
                     description=f"The {existing_channel.mention} channel is already set up.",
@@ -359,6 +364,9 @@ def register_admin_commands(bot: commands.Bot) -> None:
                 )
                 welcome_embed.set_footer(text="Duplicate Detector Bot • Keeping your server clean")
                 await channel.send(embed=welcome_embed)
+                
+                # Save channel ID to database
+                await set_log_channel(interaction.guild_id, channel.id)
                 
                 # Confirm to admin
                 embed = discord.Embed(

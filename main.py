@@ -1,6 +1,4 @@
-"""
-Discord Duplicate Image Detection Bot - Production Version
-"""
+
 import os
 import asyncio
 import logging
@@ -14,7 +12,6 @@ load_dotenv()
 import discord
 from discord.ext import commands
 
-from db import init_db_sync
 from config import ensure_guild_config
 from detection import setup_detection
 from commands_general import register_general_commands
@@ -160,6 +157,18 @@ async def on_ready():
         return
     bot._ready_initialized = True
     
+    # Initialize MongoDB
+    logger.info("Initializing MongoDB connection...")
+    try:
+        from db import init_db
+        await init_db()
+        logger.info("MongoDB connected and initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize MongoDB: {e}", exc_info=True)
+        logger.error("Bot will shut down due to database initialization failure")
+        await bot.close()
+        return
+    
     logger.info("Loading guild configurations...")
     loaded = 0
     failed = 0
@@ -218,10 +227,8 @@ def main():
     print("=" * 70 + "\n")
     
     try:
-        # Initialize database
-        logger.info("Initializing database...")
-        init_db_sync()
-        logger.info("Database initialized")
+        # Note: MongoDB will be initialized asynchronously in on_ready
+        logger.info("MongoDB will be initialized on bot startup")
         
         # Create directories
         os.makedirs("bot_data", exist_ok=True)
@@ -233,6 +240,13 @@ def main():
         setup_detection(bot)
         register_general_commands(bot)
         register_admin_commands(bot)
+        
+        # Register new feature modules
+        from analytics import register_analytics_commands
+        from whitelist import register_whitelist_commands
+        register_analytics_commands(bot)
+        register_whitelist_commands(bot)
+        
         logger.info("Modules registered")
         
         # Get token
