@@ -1,22 +1,6 @@
-# Discord Bot
-discord.py>=2.3.2
-python-dotenv>=1.0.0
-
-# MongoDB
-pymongo>=4.6.0
-motor>=3.3.2
-
-# Image Processing
-Pillow>=10.1.0
-imagehash>=4.3.1
-numpy<2.0,>=1.21.0
-scipy>=1.11.0
-
-# OCR
-pytesseract>=0.3.10
-
-# HTTP
-aiohttp>=3.9.0
-
-# Utilities
-python-dateutil>=2.8.2
+discord.py
+Pillow
+imagehash
+aiohttp
+aiosqlite
+python-dotenv
