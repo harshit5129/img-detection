@@ -65,3 +65,7 @@ if not TOKEN:
 
 # Global guild data storage
 guild_data: Dict[int, Dict[str, Any]] = {}
+
+# PATHS
+DATA_DIR = 'bot_data'
+DB_FILE = os.path.join(DATA_DIR, 'bot_data.db')

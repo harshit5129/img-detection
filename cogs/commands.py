@@ -9,11 +9,16 @@ import time
 import asyncio
 from typing import Optional
 
-from config import guild_data, TOKEN, ADMIN_ROLE_NAME, HASH_THRESHOLD, LOG_CHANNEL_NAME, AUTO_DELETE_DUPLICATES, ReactionType, ReactionConfig, DEFAULT_REACTIONS, logger
-from database import (load_guild_data, save_guild_data, get_user_stats, update_user_stats, 
-                     add_duplicate_record, get_duplicate_history, get_all_guild_hashes, 
-                     clear_guild_data, save_scan_progress, get_scan_progress, check_if_processed,
-                     db_pool, get_db_size, save_image_hash_batch)
+# Imports - calculate_hash import check karo
+from config import (guild_data, TOKEN, ADMIN_ROLE_NAME, HASH_THRESHOLD, 
+                   LOG_CHANNEL_NAME, AUTO_DELETE_DUPLICATES, ReactionType, 
+                   ReactionConfig, DEFAULT_REACTIONS, logger, MAX_CACHE_SIZE,
+                   DB_POOL_SIZE)
+from database import (load_guild_data, save_guild_data, get_user_stats, 
+                     update_user_stats, add_duplicate_record, get_duplicate_history, 
+                     get_all_guild_hashes, clear_guild_data, save_scan_progress, 
+                     get_scan_progress, check_if_processed, db_pool, get_db_size,
+                     save_image_hash_batch)
 from cache import hash_cache
 from reaction_manager import reaction_mgr
 from image_processor import download_image, calculate_hash, find_similar_images
@@ -37,7 +42,6 @@ class ConfirmView(discord.ui.View):
 class CommandsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.rate_limiter = asyncio.Lock()
     
     @app_commands.command(name="setup", description="Start the bot - blacklist all channels first (Admin only)")
     @app_commands.checks.has_permissions(administrator=True)
@@ -373,11 +377,12 @@ class CommandsCog(commands.Cog):
         try:
             users = []
             async with db_pool.acquire() as db:
-                async with db.execute(f'''
+                query = f'''
                     SELECT user_id, unique_count, duplicate_count 
                     FROM user_stats WHERE guild_id = ? 
                     ORDER BY {mode}_count DESC LIMIT 10
-                ''', (gid,)) as cur:
+                '''
+                async with db.execute(query, (gid,)) as cur:
                     async for row in cur:
                         users.append((row[0], row[1], row[2]))
             

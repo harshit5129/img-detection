@@ -4,13 +4,11 @@ from PIL import Image
 from io import BytesIO
 import asyncio
 import logging
-from cache import hash_cache
-from database import db_pool
 
 logger = logging.getLogger('DuplicateDetector')
 download_sem = asyncio.Semaphore(3)
 
-async def download_image(url: str, retries=3):
+async def download_image(url, retries=3):
     async with download_sem:
         for attempt in range(retries):
             try:
@@ -18,7 +16,6 @@ async def download_image(url: str, retries=3):
                 async with aiohttp.ClientSession(timeout=timeout) as s:
                     async with s.get(url) as r:
                         if r.status == 200:
-                            # Size check
                             cl = r.headers.get('Content-Length')
                             if cl and int(cl) > 10*1024*1024:
                                 return None
@@ -37,17 +34,17 @@ async def download_image(url: str, retries=3):
                                         'megapixels': (img.size[0]*img.size[1])/1_000_000
                                     }
                             except:
-                                return {'content': data, 'width': 0, 'height': 0, 'format': 'UNKNOWN', 'size_mb': len(data)/(1024*1024), 'megapixels': 0}
+                                return {'content': data, 'width': 0, 'height': 0, 
+                                       'format': 'UNKNOWN', 'size_mb': len(data)/(1024*1024), 'megapixels': 0}
                         elif r.status == 429:
                             await asyncio.sleep(int(r.headers.get('Retry-After', 5)))
             except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(2 ** attempt)
-                else:
-                    logger.error(f"Download failed: {e}")
         return None
 
-def calc_hash(image_bytes):
+def calculate_hash(image_bytes):  # Yeh function name exact match hona chahiye
+    """Calculate perceptual hash - renamed to calculate_hash for consistency"""
     try:
         img = Image.open(BytesIO(image_bytes))
         if img.mode not in ('RGB', 'L'):
@@ -57,8 +54,11 @@ def calc_hash(image_bytes):
         logger.error(f"Hash error: {e}")
         return None
 
-async def find_similar(guild_id, new_hash, channel_id=None, threshold=5):
+async def find_similar_images(guild_id, new_hash, channel_id=None, threshold=5):
     try:
+        from cache import hash_cache
+        from database import db_pool
+        
         similar = []
         checked = set()
         
@@ -108,5 +108,5 @@ async def find_similar(guild_id, new_hash, channel_id=None, threshold=5):
                         continue
         return similar
     except Exception as e:
-        logger.error(f"Find similar error: {e}")
+        logger.error(f"Find error: {e}")
         return []

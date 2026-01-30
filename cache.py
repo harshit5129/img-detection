@@ -32,4 +32,5 @@ class LRUCache:
     def size(self):
         return len(self.cache)
 
+from config import MAX_CACHE_SIZE
 hash_cache = LRUCache(MAX_CACHE_SIZE)

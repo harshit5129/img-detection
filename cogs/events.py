@@ -1,11 +1,12 @@
 import discord
 from discord.ext import commands
-import time
 import logging
+import time
+import asyncio
 from datetime import datetime
 
 from config import guild_data, HASH_THRESHOLD, AUTO_DELETE_DUPLICATES, LOG_CHANNEL_NAME, ReactionType, logger
-from database import load_guild_data, update_user_stats, add_duplicate_record, save_image_hash_batch
+from database import load_guild_data, update_user_stats, add_duplicate_record, save_image_hash_batch, check_if_processed
 
 logger = logging.getLogger('DuplicateDetector')
 
@@ -95,7 +96,6 @@ class EventsCog(commands.Cog):
                 continue
             
             # Check if already processed
-            from database import check_if_processed
             if await check_if_processed(gid, message.id):
                 await self.reaction_mgr.add_reaction(message, ReactionType.UNIQUE)
                 continue
@@ -158,6 +158,8 @@ class EventsCog(commands.Cog):
     async def send_duplicate_alert(self, message, attachment, similar, metadata, process_time):
         """Send detailed duplicate alert"""
         try:
+            from utils import get_time_ago
+            
             log_ch = discord.utils.get(message.guild.channels, name=LOG_CHANNEL_NAME)
             if not log_ch:
                 log_ch = message.channel
@@ -230,8 +232,9 @@ class EventsCog(commands.Cog):
             embed.set_thumbnail(url=attachment.url)
             
             # Notification settings
-            config = guild_data[message.guild.id]['config']
-            notif_settings = config.get('notification_settings', {}).get(str(message.guild.id), {})
+            from config import ADMIN_ROLE_NAME
+            config_data = guild_data[message.guild.id]['config']
+            notif_settings = config_data.get('notification_settings', {}).get(str(message.guild.id), {})
             mention_type = notif_settings.get('type', 'role')
             
             content = None

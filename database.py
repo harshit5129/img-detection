@@ -7,7 +7,9 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple, Any
-from config import ReactionConfig, logger, DATA_DIR, DB_FILE
+
+# Fixed import - import specific items first
+from config import ReactionConfig, logger, DATA_DIR, DB_FILE, DB_POOL_SIZE, MAX_CACHE_SIZE
 import config
 
 # Ensure directory exists
@@ -236,6 +238,8 @@ async def save_guild_data(guild_id: int) -> bool:
 async def save_image_hash_batch(batch_data: List[Tuple]) -> bool:
     """Save multiple image hashes in a single transaction"""
     try:
+        from cache import hash_cache
+        
         async with db_pool.acquire() as db:
             await db.executemany('''
                 INSERT OR IGNORE INTO image_hashes 
@@ -245,7 +249,6 @@ async def save_image_hash_batch(batch_data: List[Tuple]) -> bool:
             await db.commit()
 
         # Update cache
-        from cache import hash_cache
         for data in batch_data:
             guild_id, hash_str, message_id, channel_id, user_id, timestamp, image_url = data
             hash_key = f"{guild_id}_{hash_str}"
@@ -346,6 +349,7 @@ async def get_duplicate_history(guild_id: int, limit: int = 100) -> List[Dict]:
 async def get_all_guild_hashes(guild_id: int) -> Dict:
     """Get all image hashes for a guild"""
     try:
+        import imagehash as ih
         hashes = {}
         async with db_pool.acquire() as db:
             async with db.execute('''
@@ -354,7 +358,6 @@ async def get_all_guild_hashes(guild_id: int) -> Dict:
             ''', (guild_id,)) as cursor:
                 async for row in cursor:
                     try:
-                        import imagehash as ih
                         hash_obj = ih.hex_to_hash(row[0])
                         if hash_obj not in hashes:
                             hashes[hash_obj] = []
@@ -369,6 +372,8 @@ async def get_all_guild_hashes(guild_id: int) -> Dict:
 async def clear_guild_data(guild_id: int) -> bool:
     """Clear all data for a guild"""
     try:
+        from cache import hash_cache
+        
         async with db_pool.acquire() as db:
             await db.execute('DELETE FROM image_hashes WHERE guild_id = ?', (guild_id,))
             await db.execute('DELETE FROM user_stats WHERE guild_id = ?', (guild_id,))
@@ -376,7 +381,6 @@ async def clear_guild_data(guild_id: int) -> bool:
             await db.execute('DELETE FROM scan_progress WHERE guild_id = ?', (guild_id,))
             await db.commit()
 
-        from cache import hash_cache
         await hash_cache.clear_guild(guild_id)
         logger.info(f"Cleared data for guild {guild_id}")
         return True
