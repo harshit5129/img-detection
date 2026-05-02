@@ -11,8 +11,6 @@ logging.basicConfig(
 logger = logging.getLogger('ArtBot')
 
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-ADMIN_ROLE_NAME = os.getenv('ADMIN_ROLE_NAME', 'Admin')
-LOG_CHANNEL_NAME = os.getenv('LOG_CHANNEL_NAME', 'art-logs')
 AUTO_DELETE_DUPLICATES = os.getenv('AUTO_DELETE_DUPLICATES', 'false').lower() == 'true'
 HASH_THRESHOLD = int(os.getenv('HASH_THRESHOLD', '5'))
 

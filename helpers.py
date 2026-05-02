@@ -7,6 +7,13 @@ from PIL import Image
 from typing import Optional, Dict
 from config import RATE_LIMIT_DELAY, MAX_CONCURRENT_DOWNLOADS, DOWNLOAD_TIMEOUT, logger
 
+async def auto_remove_reaction(message, emoji):
+    await asyncio.sleep(3)
+    try:
+        await message.remove_reaction(emoji, message.guild.me)
+    except:
+        pass
+
 class RateLimiter:
     def __init__(self, rate: float):
         self.rate = rate

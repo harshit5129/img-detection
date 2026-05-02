@@ -43,3 +43,5 @@ Thumbs.db
 # Bot specific
 data/
 config.json
+
+AGENTS.md

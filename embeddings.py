@@ -23,13 +23,18 @@ def _norm(v: np.ndarray) -> np.ndarray:
 def _embed_image_sync(path_or_pil):
     if image_model is None:
         raise RuntimeError("Image model not loaded")
+    label = path_or_pil if isinstance(path_or_pil, str) else type(path_or_pil).__name__
+    logger.info(f"Creating image embedding for: {label}")
     emb = list(image_model.embed([path_or_pil]))[0]
+    logger.info(f"Image embedding created, shape: {emb.shape}")
     return _norm(emb)
 
 def _embed_text_sync(text: str):
     if text_model is None:
         raise RuntimeError("Text model not loaded")
+    logger.info(f"Creating text embedding for: {text[:50]}...")
     emb = list(text_model.embed([text]))[0]
+    logger.info(f"Text embedding created, shape: {emb.shape}")
     return _norm(emb)
 
 async def embed_image(path_or_pil) -> np.ndarray:

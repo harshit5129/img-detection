@@ -96,8 +96,10 @@ class Events(commands.Cog):
             if existing:
                 continue
 
+            from helpers import auto_remove_reaction
             try:
                 await message.add_reaction("🔄")
+                asyncio.create_task(auto_remove_reaction(message, "🔄"))
             except:
                 pass
 
@@ -105,8 +107,8 @@ class Events(commands.Cog):
             dl = await download_image(att.url)
             if not dl:
                 try:
-                    await message.remove_reaction("🔄", self.bot.user)
                     await message.add_reaction("⚠️")
+                    asyncio.create_task(auto_remove_reaction(message, "⚠️"))
                 except:
                     pass
                 continue
@@ -133,8 +135,8 @@ class Events(commands.Cog):
 
             if emb is None:
                 try:
-                    await message.remove_reaction("🔄", self.bot.user)
                     await message.add_reaction("❌")
+                    asyncio.create_task(auto_remove_reaction(message, "❌"))
                 except:
                     pass
                 continue
@@ -158,14 +160,14 @@ class Events(commands.Cog):
                 })
 
                 try:
-                    await message.remove_reaction("🔄", self.bot.user)
                     await message.add_reaction("🔖")
+                    asyncio.create_task(auto_remove_reaction(message, "🔖"))
                 except:
                     pass
             else:
                 try:
-                    await message.remove_reaction("🔄", self.bot.user)
                     await message.add_reaction("⚠️")
+                    asyncio.create_task(auto_remove_reaction(message, "⚠️"))
                 except:
                     pass
 

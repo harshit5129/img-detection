@@ -9,6 +9,7 @@ class ArtBot(commands.Bot):
         intents.message_content = True
         intents.guilds = True
         intents.members = True
+        intents.messages = True
 
         super().__init__(command_prefix='!', intents=intents, help_command=None)
 
@@ -44,6 +45,11 @@ class ArtBot(commands.Bot):
                 await interaction.response.send_message(f"❌ Error: {str(error)[:100]}", ephemeral=True)
             else:
                 await interaction.followup.send(f"❌ Error: {str(error)[:100]}", ephemeral=True)
+
+    async def close(self):
+        from database import db_pool
+        await db_pool.close_all()
+        await super().close()
 
 def create_bot():
     return ArtBot()

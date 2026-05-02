@@ -103,6 +103,36 @@ class Admin(commands.Cog):
             guild_indices[interaction.guild_id] = {'ids': [], 'embeddings': np.array([]).reshape(0, 512), 'meta': []}
         await interaction.followup.send("✅ All server data wiped.", ephemeral=True)
 
+    @app_commands.command(name="setup", description="Initialize bot for this server")
+    async def setup(self, interaction: discord.Interaction):
+        if not interaction.guild:
+            await interaction.response.send_message("❌ Server only.", ephemeral=True)
+            return
+        guild_id = interaction.guild_id
+
+        whitelists = guild_data.get(guild_id, {}).get('whitelist', set())
+        if whitelists:
+            await interaction.response.send_message("✅ Already set up. Use `/whitelist` to add channels.", ephemeral=True)
+            return
+
+        guild_data[guild_id] = {
+            'whitelist': set(),
+            'blacklist': set(),
+            'user_whitelist': set(),
+            'mod_roles': set(),
+            'hash_threshold': 5,
+            'auto_delete': False,
+            'log_channel_id': None
+        }
+        await save_guild_config(guild_id)
+
+        embed = discord.Embed(
+            title="✅ Art Bot Initialized",
+            description="Now run `/whitelist #channel` to enable auto-indexing.",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
     @app_commands.command(name="optimize", description="Optimize database")
     async def optimize(self, interaction: discord.Interaction):
         if not interaction.guild:
@@ -123,21 +153,26 @@ class Admin(commands.Cog):
             logger.error(f"Optimize error: {e}")
             await interaction.followup.send("❌ Optimization failed.", ephemeral=True)
 
-    @app_commands.command(name="help", description="Show help and commands list")
+    @app_commands.command(name="bothelp", description="Show help and commands list")
     async def help_cmd(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="📖 Art Bot Help",
-            description="Semantic image search bot for Discord servers",
+            description="Semantic image search using CLIP embeddings",
             color=discord.Color.blue()
         )
         embed.add_field(
-            name="📸 Image Commands",
-            value="• `/search [query]` - Search images by text\n• `/searchbyimage` - Find similar images\n• `/gallery [user]` - Browse all/someone's images\n• `/random` - Show random image",
+            name="🔍 Search",
+            value="• `/search [query]` - Search by text\n• `/searchbyimage` - Find similar images\n• `/gallery [user]` - Browse someone's gallery\n• `/random` - Random image\n• `/show [id]` - Show image by ID",
             inline=False
         )
         embed.add_field(
-            name="⚙️ Admin Commands",
-            value="• `/setup` - Initialize bot\n• `/whitelist #channel` - Enable auto-indexing\n• `/blacklist #channel` - Block channel\n• `/scan` - Scan all channels\n• `/scanchannel #channel` - Scan specific channel\n• `/stats` - Show statistics\n• `/cleardata` - Wipe all data\n• `/optimize` - Optimize database",
+            name="🏷️ Tags",
+            value="• `/tag [msg_id] [tag]` - Add tag\n• `/untag [msg_id] [tag]` - Remove tag\n• `/tags [msg_id]` - List tags\n• `/tagsearch [tag]` - Search by tag\n• `/mygallery` - My uploaded images",
+            inline=False
+        )
+        embed.add_field(
+            name="⚙️ Admin",
+            value="• `/setup` - Initialize server\n• `/whitelist #channel` - Enable indexing\n• `/blacklist #channel` - Block channel\n• `/scan` - Scan all channels\n• `/scanchannel #channel` - Scan one channel\n• `/setmod @role` - Set mod role\n• `/stats` - Show stats\n• `/cleardata` - Wipe data\n• `/optimize` - Optimize DB",
             inline=False
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)

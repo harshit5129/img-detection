@@ -3,7 +3,7 @@ import asyncio
 import aiosqlite
 import json
 from datetime import datetime
-from typing import Optional, List, Tuple, Dict
+from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
 import numpy as np
 
@@ -120,33 +120,20 @@ async def load_guild_config(guild_id: int):
     from config import guild_data
     try:
         async with db_pool.acquire() as db:
-            async with db.execute('SELECT * FROM guild_config WHERE guild_id = ?', (guild_id,)) as cur:
+            async with db.execute(
+                'SELECT guild_id, whitelist, blacklist, user_whitelist, mod_roles, hash_threshold, auto_delete, log_channel_id FROM guild_config WHERE guild_id = ?',
+                (guild_id,)
+            ) as cur:
                 row = await cur.fetchone()
                 if row:
-                    try:
-                        mod_roles = set(json.loads(row[4])) if row[4] else set()
-                    except:
-                        mod_roles = set()
-                    try:
-                        hash_threshold = row[5] if len(row) > 5 and row[5] is not None else 5
-                    except:
-                        hash_threshold = 5
-                    try:
-                        auto_delete = bool(row[6]) if len(row) > 6 and row[6] is not None else False
-                    except:
-                        auto_delete = False
-                    try:
-                        log_channel_id = row[7] if len(row) > 7 else None
-                    except:
-                        log_channel_id = None
                     guild_data[guild_id] = {
                         'whitelist': set(json.loads(row[1])) if row[1] else set(),
                         'blacklist': set(json.loads(row[2])) if row[2] else set(),
                         'user_whitelist': set(json.loads(row[3])) if row[3] else set(),
-                        'mod_roles': mod_roles,
-                        'hash_threshold': hash_threshold,
-                        'auto_delete': auto_delete,
-                        'log_channel_id': log_channel_id
+                        'mod_roles': set(json.loads(row[4])) if row[4] else set(),
+                        'hash_threshold': row[5] if row[5] is not None else 5,
+                        'auto_delete': bool(row[6]) if row[6] is not None else False,
+                        'log_channel_id': row[7]
                     }
                 else:
                     guild_data[guild_id] = {
