@@ -180,6 +180,50 @@ class Admin(commands.Cog):
         
         await interaction.followup.send(f"✅ Stopped tracking {channel.mention}", ephemeral=True)
 
+    @app_commands.command(name="tracked", description="Show tracked and untracked channels")
+    async def tracked(self, interaction: discord.Interaction):
+        if not interaction.guild:
+            await interaction.response.send_message("❌ Server only.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        
+        guild_id = interaction.guild_id
+        await load_guild_config(guild_id)
+        
+        whitelist = guild_data.get(guild_id, {}).get('whitelist', set())
+        blacklist = guild_data.get(guild_id, {}).get('blacklist', set())
+        
+        tracked = []
+        untracked = []
+        
+        for channel in interaction.guild.text_channels:
+            if channel.id in whitelist:
+                tracked.append(channel)
+            elif channel.id in blacklist:
+                untracked.append(channel)
+            else:
+                untracked.append(channel)
+        
+        embed = discord.Embed(
+            title="📊 Channel Tracking Status",
+            color=discord.Color.blue()
+        )
+        
+        if tracked:
+            tracked_list = "\n".join(f"• {ch.mention}" for ch in tracked[:20])
+            if len(tracked) > 20:
+                tracked_list += f"\n... and {len(tracked) - 20} more"
+            embed.add_field(name=f"✅ Tracked ({len(tracked)})", value=tracked_list or "None", inline=False)
+        
+        if untracked:
+            untracked_list = "\n".join(f"• {ch.mention}" for ch in untracked[:20])
+            if len(untracked) > 20:
+                untracked_list += f"\n... and {len(untracked) - 20} more"
+            embed.add_field(name=f"❌ Untracked ({len(untracked)})", value=untracked_list or "None", inline=False)
+        
+        embed.set_footer(text=f"Total: {len(interaction.guild.text_channels)} channels")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
     @app_commands.command(name="optimize", description="Optimize database")
     async def optimize(self, interaction: discord.Interaction):
         if not interaction.guild:
@@ -219,7 +263,7 @@ class Admin(commands.Cog):
         )
         embed.add_field(
             name="⚙️ Admin",
-            value="• `/setup` - Initialize & auto-track all channels\n• `/track #channel` - Start tracking channel\n• `/untrack #channel` - Stop tracking channel\n• `/scan` - Scan all tracked channels\n• `/scanchannel #channel` - Scan specific channel\n• `/setmod @role` - Set moderator role\n• `/stats` - Show server statistics\n• `/cleardata` - Wipe all server data\n• `/optimize` - Optimize database",
+            value="• `/setup` - Initialize & auto-track all channels\n• `/track #channel` - Start tracking channel\n• `/untrack #channel` - Stop tracking channel\n• `/tracked` - Show tracked/untracked channels\n• `/scan` - Scan all tracked channels\n• `/scanchannel #channel` - Scan specific channel\n• `/setmod @role` - Set moderator role\n• `/stats` - Show server statistics\n• `/cleardata` - Wipe all server data\n• `/optimize` - Optimize database",
             inline=False
         )
         embed.add_field(
