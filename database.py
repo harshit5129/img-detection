@@ -76,7 +76,6 @@ def init_db_sync():
                     height INTEGER,
                     format TEXT,
                     size_mb REAL,
-                    phash TEXT,
                     embedding BLOB,
                     created_at TEXT,
                     UNIQUE(guild_id, message_id)
@@ -107,7 +106,7 @@ def init_db_sync():
 
             c.execute('CREATE INDEX IF NOT EXISTS idx_img_guild ON images(guild_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_img_user ON images(guild_id, user_id)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_img_phash ON images(guild_id, phash)')
+            
             c.execute('CREATE INDEX IF NOT EXISTS idx_tags_image ON tags(image_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag COLLATE NOCASE)')
 
@@ -172,17 +171,17 @@ async def save_guild_config(guild_id: int):
         logger.error(f"Save config error: {e}")
 
 async def add_image(guild_id, channel_id, message_id, user_id, username, url,
-                    width, height, fmt, size_mb, phash, embedding: np.ndarray) -> int:
+                    width, height, fmt, size_mb, embedding: np.ndarray) -> int:
     try:
         emb_bytes = embedding.astype(np.float32).tobytes()
         async with db_pool.acquire() as db:
             cur = await db.execute('''
                 INSERT OR IGNORE INTO images
                 (guild_id, channel_id, message_id, user_id, username, url,
-                 width, height, format, size_mb, phash, embedding, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 width, height, format, size_mb, embedding, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (guild_id, channel_id, message_id, user_id, username, url,
-                  width, height, fmt, size_mb, str(phash) if phash else None,
+                  width, height, fmt, size_mb,
                   emb_bytes, datetime.now().isoformat()))
             await db.commit()
             return cur.lastrowid

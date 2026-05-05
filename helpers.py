@@ -1,7 +1,6 @@
 import asyncio
 import aiohttp
 import time
-import imagehash
 from io import BytesIO
 from PIL import Image
 from typing import Optional, Dict
@@ -56,16 +55,6 @@ async def download_image(url: str) -> Optional[dict]:
         except Exception as e:
             logger.error(f"Download error: {e}")
     return None
-
-def calc_phash(image_bytes: bytes):
-    try:
-        img = Image.open(BytesIO(image_bytes))
-        if img.mode not in ('RGB', 'L'):
-            img = img.convert('RGB')
-        return imagehash.phash(img)
-    except Exception as e:
-        logger.error(f"Hash error: {e}")
-        return None
 
 def generate_auto_tags(width: int, height: int, fmt: str, size_mb: float) -> list:
     tags = []

@@ -6,13 +6,13 @@ import os
 import time
 import numpy as np
 
-from config import logger, guild_data, guild_indices, HASH_THRESHOLD
+from config import logger, guild_data, guild_indices
 from database import (
     db_pool, init_db_sync, load_guild_config, save_guild_config,
     add_image, get_image_by_message, add_tag, get_tags
 )
 from embeddings import embed_image
-from helpers import download_image, calc_phash, generate_auto_tags, rate_limiter
+from helpers import download_image, generate_auto_tags, rate_limiter
 
 class Events(commands.Cog):
     def __init__(self, bot):
@@ -113,11 +113,6 @@ class Events(commands.Cog):
                     pass
                 continue
 
-            phash = calc_phash(dl['content'])
-            if phash:
-                # Optional: check exact duplicate by phash here if desired
-                pass
-
             # Save temp file for embedding
             tmp_path = None
             emb = None
@@ -144,7 +139,7 @@ class Events(commands.Cog):
             img_id = await add_image(
                 guild_id, message.channel.id, message.id, message.author.id,
                 str(message.author), att.url, dl['width'], dl['height'],
-                dl['format'], dl['size_mb'], phash, emb
+                dl['format'], dl['size_mb'], emb
             )
 
             if img_id > 0:

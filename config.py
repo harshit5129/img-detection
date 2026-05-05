@@ -11,8 +11,6 @@ logging.basicConfig(
 logger = logging.getLogger('ArtBot')
 
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-AUTO_DELETE_DUPLICATES = os.getenv('AUTO_DELETE_DUPLICATES', 'false').lower() == 'true'
-HASH_THRESHOLD = int(os.getenv('HASH_THRESHOLD', '5'))
 EMBED_API_URL = os.getenv('EMBED_API_URL')
 EMBED_API_KEY = os.getenv('API_KEY')
 USE_EMBED_API = bool(EMBED_API_URL and EMBED_API_KEY)
@@ -21,11 +19,9 @@ DATA_DIR = 'bot_data'
 DB_FILE = os.path.join(DATA_DIR, 'artbot.db')
 os.makedirs(DATA_DIR, exist_ok=True)
 
-MAX_CACHE_SIZE = 2000
 DB_POOL_SIZE = 5
 MAX_CONCURRENT_DOWNLOADS = 3
 RATE_LIMIT_DELAY = 1.5
-BATCH_COMMIT_SIZE = 50
 DOWNLOAD_TIMEOUT = 20
 EMBEDDING_DIM = 512
 TOP_K_SEARCH = 20

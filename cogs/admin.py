@@ -8,7 +8,7 @@ import numpy as np
 from config import DB_FILE, guild_data, guild_indices, logger
 from database import db_pool, delete_guild_data, get_db_stats, load_guild_config, save_guild_config, add_image, get_image_by_message, add_tag
 from embeddings import embed_image
-from helpers import download_image, calc_phash, generate_auto_tags, rate_limiter
+from helpers import download_image, generate_auto_tags, rate_limiter
 
 class Admin(commands.Cog):
     def __init__(self, bot):
@@ -223,8 +223,6 @@ class Admin(commands.Cog):
                             failed += 1
                             continue
                         
-                        phash = calc_phash(dl['content'])
-                        
                         suffix = os.path.splitext(att.filename)[1] or '.png'
                         tmp_path = None
                         emb = None
@@ -244,7 +242,7 @@ class Admin(commands.Cog):
                         img_id = await add_image(
                             guild_id, message.channel.id, message.id, message.author.id,
                             str(message.author), att.url, dl['width'], dl['height'],
-                            dl['format'], dl['size_mb'], phash, emb
+                            dl['format'], dl['size_mb'], emb
                         )
                         
                         if img_id > 0:
@@ -311,8 +309,6 @@ class Admin(commands.Cog):
                         failed += 1
                         continue
                     
-                    phash = calc_phash(dl['content'])
-                    
                     suffix = os.path.splitext(att.filename)[1] or '.png'
                     tmp_path = None
                     emb = None
@@ -332,7 +328,7 @@ class Admin(commands.Cog):
                     img_id = await add_image(
                         guild_id, message.channel.id, message.id, message.author.id,
                         str(message.author), att.url, dl['width'], dl['height'],
-                        dl['format'], dl['size_mb'], phash, emb
+                        dl['format'], dl['size_mb'], emb
                     )
                     
                     if img_id > 0:
