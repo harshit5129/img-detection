@@ -29,12 +29,12 @@ async def embed_image(path_or_pil) -> np.ndarray:
     if USE_EMBED_API:
         async with aiohttp.ClientSession() as session:
             headers = {"Authorization": f"Bearer {EMBED_API_KEY}"}
+            data = aiohttp.FormData()
             with open(path_or_pil, 'rb') as f:
-                data = aiohttp.FormData()
                 data.add_field('file', f, filename='image.png', content_type='image/png')
-            async with session.post(f"{EMBED_API_URL}/embed/image", headers=headers, data=data) as resp:
-                result = await resp.json()
-                return np.array(result['embedding'], dtype=np.float32)
+                async with session.post(f"{EMBED_API_URL}/embed/image", headers=headers, data=data) as resp:
+                    result = await resp.json()
+                    return np.array(result['embedding'], dtype=np.float32)
     else:
         if image_model is None:
             raise RuntimeError("Image model not loaded")
