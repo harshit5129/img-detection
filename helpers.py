@@ -1,6 +1,8 @@
 import asyncio
 import aiohttp
 import time
+import tempfile
+import os
 from io import BytesIO
 from PIL import Image
 from typing import Optional, Dict
@@ -86,3 +88,37 @@ def generate_auto_tags(width: int, height: int, fmt: str, size_mb: float) -> lis
             tags.append("resolution:icon")
 
     return tags
+
+async def process_image(url: str, filename: str = None) -> Optional[dict]:
+    """Download and process an image, return metadata and embedding"""
+    dl = await download_image(url)
+    if not dl:
+        return None
+    
+    # Generate embedding
+    from embeddings import embed_image
+    tmp_path = None
+    emb = None
+    try:
+        suffix = os.path.splitext(filename or 'image.png')[1] or '.png'
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(dl['content'])
+            tmp_path = tmp.name
+        emb = await embed_image(tmp_path)
+    except Exception as e:
+        logger.error(f"Embedding error: {e}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+    
+    if emb is None:
+        return None
+    
+    return {
+        'content': dl['content'],
+        'width': dl['width'],
+        'height': dl['height'],
+        'format': dl['format'],
+        'size_mb': dl['size_mb'],
+        'embedding': emb
+    }

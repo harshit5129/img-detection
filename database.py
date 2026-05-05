@@ -155,7 +155,7 @@ async def save_guild_config(guild_id: int):
             await db.execute('''
                 INSERT OR REPLACE INTO guild_config
                 (guild_id, whitelist, blacklist, user_whitelist, mod_roles, hash_threshold, auto_delete, log_channel_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 guild_id,
                 json.dumps(list(cfg.get('whitelist', set()))),

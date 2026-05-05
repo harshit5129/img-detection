@@ -103,20 +103,20 @@ class Admin(commands.Cog):
             guild_indices[interaction.guild_id] = {'ids': [], 'embeddings': np.array([]).reshape(0, 512), 'meta': []}
         await interaction.followup.send("✅ All server data wiped.", ephemeral=True)
 
-    @app_commands.command(name="setup", description="Initialize bot for this server")
+    @app_commands.command(name="setup", description="Initialize bot for this server and auto-track all channels")
     async def setup(self, interaction: discord.Interaction):
         if not interaction.guild:
             await interaction.response.send_message("❌ Server only.", ephemeral=True)
             return
+        await interaction.response.defer(ephemeral=True)
+        
         guild_id = interaction.guild_id
-
-        whitelists = guild_data.get(guild_id, {}).get('whitelist', set())
-        if whitelists:
-            await interaction.response.send_message("✅ Already set up. Use `/whitelist` to add channels.", ephemeral=True)
-            return
-
+        await load_guild_config(guild_id)
+        
+        # Auto-track all text channels
+        all_channels = {ch.id for ch in interaction.guild.text_channels}
         guild_data[guild_id] = {
-            'whitelist': set(),
+            'whitelist': all_channels,
             'blacklist': set(),
             'user_whitelist': set(),
             'mod_roles': set(),
@@ -125,13 +125,60 @@ class Admin(commands.Cog):
             'log_channel_id': None
         }
         await save_guild_config(guild_id)
-
+        
         embed = discord.Embed(
             title="✅ Art Bot Initialized",
-            description="Now run `/whitelist #channel` to enable auto-indexing.",
+            description=f"Auto-tracking {len(all_channels)} channels. Use `/untrack #channel` to stop tracking specific channels.",
             color=discord.Color.green()
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        embed.add_field(name="Tracking", value=f"{len(all_channels)} channels", inline=True)
+        embed.add_field(name="Next steps", value="Use `/track` or `/untrack` to manage channels", inline=False)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="track", description="Start tracking a channel for images")
+    async def track(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        if not interaction.guild:
+            await interaction.response.send_message("❌ Server only.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        
+        if not await self.check_mod(interaction):
+            await interaction.followup.send("❌ Admin/Mod only.", ephemeral=True)
+            return
+        
+        guild_id = interaction.guild_id
+        await load_guild_config(guild_id)
+        
+        if channel.id in guild_data[guild_id]['whitelist']:
+            await interaction.followup.send(f"✅ {channel.mention} is already being tracked.", ephemeral=True)
+            return
+        
+        guild_data[guild_id]['whitelist'].add(channel.id)
+        if channel.id in guild_data[guild_id]['blacklist']:
+            guild_data[guild_id]['blacklist'].remove(channel.id)
+        await save_guild_config(guild_id)
+        
+        await interaction.followup.send(f"✅ Now tracking {channel.mention}", ephemeral=True)
+
+    @app_commands.command(name="untrack", description="Stop tracking a channel")
+    async def untrack(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        if not interaction.guild:
+            await interaction.response.send_message("❌ Server only.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        
+        if not await self.check_mod(interaction):
+            await interaction.followup.send("❌ Admin/Mod only.", ephemeral=True)
+            return
+        
+        guild_id = interaction.guild_id
+        await load_guild_config(guild_id)
+        
+        guild_data[guild_id]['whitelist'].discard(channel.id)
+        guild_data[guild_id]['blacklist'].add(channel.id)
+        await save_guild_config(guild_id)
+        
+        await interaction.followup.send(f"✅ Stopped tracking {channel.mention}", ephemeral=True)
 
     @app_commands.command(name="optimize", description="Optimize database")
     async def optimize(self, interaction: discord.Interaction):
@@ -157,22 +204,27 @@ class Admin(commands.Cog):
     async def help_cmd(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="📖 Art Bot Help",
-            description="Semantic image search using CLIP embeddings",
+            description="Semantic image search using CLIP embeddings - automatically indexes images from tracked channels",
             color=discord.Color.blue()
         )
         embed.add_field(
             name="🔍 Search",
-            value="• `/search [query]` - Search by text\n• `/searchbyimage` - Find similar images\n• `/gallery [user]` - Browse someone's gallery\n• `/random` - Random image\n• `/show [id]` - Show image by ID",
+            value="• `/search [query]` - Search by text description\n• `/searchbyimage` - Upload image to find similar\n• `/gallery [user]` - Browse all or user's gallery\n• `/random` - Show random image\n• `/show [id]` - Show image by ID",
             inline=False
         )
         embed.add_field(
             name="🏷️ Tags",
-            value="• `/tag [msg_id] [tag]` - Add tag\n• `/untag [msg_id] [tag]` - Remove tag\n• `/tags [msg_id]` - List tags\n• `/tagsearch [tag]` - Search by tag\n• `/mygallery` - My uploaded images",
+            value="• `/tag [msg_id] [tag]` - Add tag to image\n• `/untag [msg_id] [tag]` - Remove tag\n• `/tags [msg_id]` - List image tags\n• `/tagsearch [tag]` - Search by tag\n• `/mygallery` - Browse your uploads",
             inline=False
         )
         embed.add_field(
             name="⚙️ Admin",
-            value="• `/setup` - Initialize server\n• `/whitelist #channel` - Enable indexing\n• `/blacklist #channel` - Block channel\n• `/scan` - Scan all channels\n• `/scanchannel #channel` - Scan one channel\n• `/setmod @role` - Set mod role\n• `/stats` - Show stats\n• `/cleardata` - Wipe data\n• `/optimize` - Optimize DB",
+            value="• `/setup` - Initialize & auto-track all channels\n• `/track #channel` - Start tracking channel\n• `/untrack #channel` - Stop tracking channel\n• `/scan` - Scan all tracked channels\n• `/scanchannel #channel` - Scan specific channel\n• `/setmod @role` - Set moderator role\n• `/stats` - Show server statistics\n• `/cleardata` - Wipe all server data\n• `/optimize` - Optimize database",
+            inline=False
+        )
+        embed.add_field(
+            name="💡 Tips",
+            value="• Right-click any image → Apps → 🔍 Find Similar\n• Use `/setup` to start tracking all channels\n• Images are auto-indexed when posted in tracked channels",
             inline=False
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
