@@ -195,11 +195,15 @@ class Admin(commands.Cog):
         guild = interaction.guild
         guild_id = guild.id
         
+        await load_guild_config(guild_id)
+        
         total_scanned = 0
         total_added = 0
         failed = 0
         
         await interaction.followup.send("⏳ Starting full scan...", ephemeral=True)
+        
+        logger.info(f"Scan started for guild {guild_id}, channels: {len(guild.text_channels)}")
         
         for channel in guild.text_channels:
             if channel.id in guild_data.get(guild_id, {}).get('blacklist', set()):
@@ -284,6 +288,8 @@ class Admin(commands.Cog):
             await interaction.followup.send("❌ Admin/Mod only.", ephemeral=True)
             return
         guild_id = interaction.guild_id
+        
+        await load_guild_config(guild_id)
         
         total_scanned = 0
         total_added = 0
