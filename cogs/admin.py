@@ -182,7 +182,12 @@ class Admin(commands.Cog):
         if not interaction.guild:
             await interaction.response.send_message("❌ Server only.", ephemeral=True)
             return
-        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.error(f"Defer failed: {e}")
+            return
         
         if not await self.check_mod(interaction):
             await interaction.followup.send("❌ Admin/Mod only.", ephemeral=True)
