@@ -1,6 +1,6 @@
 # Art Detection Bot
 
- Discord bot for semantic image search using FastEmbed embeddings.
+ Discord bot for semantic image search using external embedding API (CLIP). Requires EMBED_API_URL and API_KEY environment variables.
 
 ## Features
 
@@ -48,6 +48,8 @@ uv run main.py
 Create a `.env` file:
 ```
 DISCORD_BOT_TOKEN=your_token_here
+EMBED_API_URL=https://your-embed-api.com
+API_KEY=your_api_key
 ```
 
 ## Permissions Required
@@ -62,7 +64,7 @@ DISCORD_BOT_TOKEN=your_token_here
 
 - Python 3.12+
 - discord.py
-- FastEmbed
 - NumPy
 - aiosqlite
 - PIL
+- aiohttp

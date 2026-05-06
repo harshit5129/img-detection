@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from config import logger
-from database import get_image_by_message, add_tag, remove_tag, get_tags, search_by_tag
+from database import get_image_by_message, add_tag, remove_tag, get_tags, search_by_tag, get_images_by_user
 from views import ImagePaginator
 
 class Tags(commands.Cog):
@@ -95,7 +95,6 @@ class Tags(commands.Cog):
         await interaction.response.defer()
         guild_id = interaction.guild_id
 
-        from database import get_images_by_user
         rows = await get_images_by_user(guild_id, interaction.user.id, limit=500)
         if not rows:
             await interaction.followup.send("❌ You haven't uploaded any indexed images yet.", ephemeral=True)

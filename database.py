@@ -3,7 +3,6 @@ import asyncio
 import aiosqlite
 import json
 from datetime import datetime
-from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
 import numpy as np
 

@@ -4,7 +4,7 @@ from discord.ext import commands
 import numpy as np
 
 from config import logger, guild_indices, TOP_K_SEARCH
-from database import get_tags, get_image_by_message
+from database import get_tags, get_image_by_message, get_images_by_guild, get_images_by_user, get_image_by_id
 from embeddings import embed_text, embed_image, cosine_similarity_batch
 from views import ImagePaginator
 from helpers import download_image
@@ -43,12 +43,15 @@ async def find_similar_context_callback(interaction: discord.Interaction, messag
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
+        if q_emb is None:
+            await interaction.followup.send("❌ Failed to embed image.", ephemeral=True)
+            return
+
     idx = guild_indices.get(guild_id)
     if not idx or len(idx['ids']) == 0:
         await interaction.followup.send("❌ No images indexed yet.", ephemeral=True)
         return
 
-    from embeddings import cosine_similarity_batch
     scores = cosine_similarity_batch(q_emb, idx['embeddings'])
     top_k = min(TOP_K_SEARCH, len(scores))
     top_idx = np.argsort(scores)[::-1][:top_k]
@@ -65,7 +68,6 @@ async def find_similar_context_callback(interaction: discord.Interaction, messag
         await interaction.followup.send("❌ No similar images found.", ephemeral=True)
         return
 
-    from database import get_tags
     for r in results:
         r['tags'] = await get_tags(r['id'])
 
@@ -113,6 +115,10 @@ class Search(commands.Cog):
             await interaction.followup.send("❌ Failed to process search query.", ephemeral=True)
             return
 
+        if q_emb is None:
+            await interaction.followup.send("❌ Failed to embed search query.", ephemeral=True)
+            return
+
         results = self._search_index(guild_id, q_emb)
         if not results:
             await interaction.followup.send("❌ No matching images found.", ephemeral=True)
@@ -155,6 +161,10 @@ class Search(commands.Cog):
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
+        if q_emb is None:
+            await interaction.followup.send("❌ Failed to embed image.", ephemeral=True)
+            return
+
         results = self._search_index(guild_id, q_emb)
         if not results:
             await interaction.followup.send("❌ No similar images found.", ephemeral=True)
@@ -172,7 +182,6 @@ class Search(commands.Cog):
         await interaction.response.defer()
         guild_id = interaction.guild_id
 
-        from database import get_images_by_guild, get_images_by_user
         if user:
             rows = await get_images_by_user(guild_id, user.id, limit=500)
             title = f"{user.display_name}'s Gallery"
@@ -195,7 +204,6 @@ class Search(commands.Cog):
         await interaction.response.defer()
         guild_id = interaction.guild_id
 
-        from database import get_images_by_guild
         rows = await get_images_by_guild(guild_id, limit=1000)
         if not rows:
             await interaction.followup.send("❌ No images yet.", ephemeral=True)
@@ -224,7 +232,6 @@ class Search(commands.Cog):
         await interaction.response.defer()
         guild_id = interaction.guild_id
 
-        from database import get_image_by_id
         img = await get_image_by_id(guild_id, image_id)
         if not img:
             await interaction.followup.send("❌ Image not found.", ephemeral=True)

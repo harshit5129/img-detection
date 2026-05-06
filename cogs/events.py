@@ -9,10 +9,10 @@ import numpy as np
 from config import logger, guild_data, guild_indices
 from database import (
     db_pool, init_db_sync, load_guild_config, save_guild_config,
-    add_image, get_image_by_message, add_tag, get_tags
+    add_image, get_image_by_message, add_tag, get_tags, get_all_guild_embeddings
 )
 from embeddings import embed_image
-from helpers import download_image, generate_auto_tags, rate_limiter
+from helpers import download_image, generate_auto_tags, rate_limiter, auto_remove_reaction
 
 class Events(commands.Cog):
     def __init__(self, bot):
@@ -41,9 +41,9 @@ class Events(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
         await load_guild_config(guild.id)
+        await self._build_index(guild.id)
 
     async def _build_index(self, guild_id: int):
-        from database import get_all_guild_embeddings
         rows = await get_all_guild_embeddings(guild_id)
         if not rows:
             guild_indices[guild_id] = {'ids': [], 'embeddings': np.array([]).reshape(0, 512), 'meta': []}
@@ -96,7 +96,6 @@ class Events(commands.Cog):
             if existing:
                 continue
 
-            from helpers import auto_remove_reaction
             try:
                 await message.add_reaction("🔄")
                 asyncio.create_task(auto_remove_reaction(message, "🔄"))
