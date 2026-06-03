@@ -103,7 +103,7 @@ class Admin(commands.Cog):
             guild_indices[interaction.guild_id] = {'ids': [], 'embeddings': np.array([]).reshape(0, 512), 'meta': []}
         await interaction.followup.send("✅ All server data wiped.", ephemeral=True)
 
-    @app_commands.command(name="setup", description="Initialize bot for this server and auto-track all channels")
+    @app_commands.command(name="setup", description="Initialize bot for this server (use /track to whitelist channels)")
     async def setup(self, interaction: discord.Interaction):
         if not interaction.guild:
             await interaction.response.send_message("❌ Server only.", ephemeral=True)
@@ -113,10 +113,8 @@ class Admin(commands.Cog):
         guild_id = interaction.guild_id
         await load_guild_config(guild_id)
         
-        # Auto-track all text channels
-        all_channels = {ch.id for ch in interaction.guild.text_channels}
         guild_data[guild_id] = {
-            'whitelist': all_channels,
+            'whitelist': set(),
             'blacklist': set(),
             'user_whitelist': set(),
             'mod_roles': set(),
@@ -128,11 +126,11 @@ class Admin(commands.Cog):
         
         embed = discord.Embed(
             title="✅ Art Bot Initialized",
-            description=f"Auto-tracking {len(all_channels)} channels. Use `/untrack #channel` to stop tracking specific channels.",
+            description="Use `/track #channel` to whitelist channels for auto-indexing. Use `/scan` to bulk-scan a channel.",
             color=discord.Color.green()
         )
-        embed.add_field(name="Tracking", value=f"{len(all_channels)} channels", inline=True)
-        embed.add_field(name="Next steps", value="Use `/track` or `/untrack` to manage channels", inline=False)
+        embed.add_field(name="Tracking", value="0 channels", inline=True)
+        embed.add_field(name="Next steps", value="Use `/track #channel` to start tracking channels", inline=False)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="track", description="Start tracking a channel for images")
@@ -253,7 +251,16 @@ class Admin(commands.Cog):
         )
         embed.add_field(
             name="🔍 Search",
-            value="• `/search [query]` - Search by text description\n• `/searchbyimage` - Upload image to find similar\n• `/gallery [user]` - Browse all or user's gallery\n• `/random` - Show random image\n• `/show [id]` - Show image by ID",
+            value=(
+                "• `/search [query]` - Search by text + metadata\n"
+                "  `char:Name` / `series:Name` - Filter by metadata tag\n"
+                "  `#tag` - Exact tag match\n"
+                "  `\"name\"` - Partial tag match\n"
+                "• `/searchbyimage` - Upload image to find similar\n"
+                "• `/gallery [user]` - Browse all or user's gallery\n"
+                "• `/random` - Show random image\n"
+                "• `/show [id]` - Show image by ID"
+            ),
             inline=False
         )
         embed.add_field(
@@ -351,7 +358,7 @@ class Admin(commands.Cog):
                         )
                         
                         if img_id > 0:
-                            auto_tags = generate_auto_tags(dl['width'], dl['height'], dl['format'], dl['size_mb'])
+                            auto_tags = generate_auto_tags(dl['width'], dl['height'], dl['format'], dl['size_mb'], att.filename, message.content)
                             for t in auto_tags:
                                 await add_tag(img_id, t)
                             total_added += 1
@@ -439,7 +446,7 @@ class Admin(commands.Cog):
                     )
                     
                     if img_id > 0:
-                        auto_tags = generate_auto_tags(dl['width'], dl['height'], dl['format'], dl['size_mb'])
+                        auto_tags = generate_auto_tags(dl['width'], dl['height'], dl['format'], dl['size_mb'], att.filename, message.content)
                         for t in auto_tags:
                             await add_tag(img_id, t)
                         total_added += 1

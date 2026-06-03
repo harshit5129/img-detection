@@ -1,9 +1,27 @@
+import asyncio
 import numpy as np
-import aiohttp
-from config import EMBED_API_URL, EMBED_API_KEY, USE_EMBED_API, logger
+from config import logger
 
-if not USE_EMBED_API:
-    raise RuntimeError("USE_EMBED_API must be True (fastembed has been removed)")
+_image_model = None
+_text_model = None
+
+
+def _get_image_model():
+    global _image_model
+    if _image_model is None:
+        from fastembed import ImageEmbedding
+        _image_model = ImageEmbedding(model_name="Qdrant/clip-ViT-B-32-vision")
+        logger.info("Fastembed image model loaded")
+    return _image_model
+
+
+def _get_text_model():
+    global _text_model
+    if _text_model is None:
+        from fastembed import TextEmbedding
+        _text_model = TextEmbedding(model_name="Qdrant/clip-ViT-B-32-text")
+        logger.info("Fastembed text model loaded")
+    return _text_model
 
 
 def _normalize(v: np.ndarray) -> np.ndarray:
@@ -14,19 +32,11 @@ def _normalize(v: np.ndarray) -> np.ndarray:
 
 async def embed_image(path_or_pil) -> np.ndarray:
     try:
-        async with aiohttp.ClientSession() as session:
-            headers = {"Authorization": f"Bearer {EMBED_API_KEY}"}
-            data = aiohttp.FormData()
-            with open(path_or_pil, 'rb') as f:
-                data.add_field('file', f, filename='image.png', content_type='image/png')
-                async with session.post(f"{EMBED_API_URL}/embed/image", headers=headers, data=data) as resp:
-                    if resp.status != 200:
-                        text = await resp.text()
-                        logger.error(f"Embed API error: {resp.status} - {text}")
-                        return None
-                    result = await resp.json()
-                    emb = np.array(result['embedding'], dtype=np.float32)
-                    return _normalize(emb)
+        model = await asyncio.to_thread(_get_image_model)
+        embeddings = list(await asyncio.to_thread(model.embed, [path_or_pil]))
+        if not embeddings:
+            return None
+        return _normalize(np.array(embeddings[0], dtype=np.float32))
     except Exception as e:
         logger.error(f"Embed image error: {e}")
         return None
@@ -34,16 +44,11 @@ async def embed_image(path_or_pil) -> np.ndarray:
 
 async def embed_text(text: str) -> np.ndarray:
     try:
-        async with aiohttp.ClientSession() as session:
-            headers = {"Authorization": f"Bearer {EMBED_API_KEY}"}
-            async with session.post(f"{EMBED_API_URL}/embed/text", headers=headers, json={"text": text}) as resp:
-                if resp.status != 200:
-                    text = await resp.text()
-                    logger.error(f"Embed API error: {resp.status} - {text}")
-                    return None
-                result = await resp.json()
-                emb = np.array(result['embedding'], dtype=np.float32)
-                return _normalize(emb)
+        model = await asyncio.to_thread(_get_text_model)
+        embeddings = list(await asyncio.to_thread(model.embed, [text]))
+        if not embeddings:
+            return None
+        return _normalize(np.array(embeddings[0], dtype=np.float32))
     except Exception as e:
         logger.error(f"Embed text error: {e}")
         return None

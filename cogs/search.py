@@ -4,10 +4,11 @@ from discord.ext import commands
 import numpy as np
 
 from config import logger, guild_indices, TOP_K_SEARCH
-from database import get_tags, get_image_by_message, get_images_by_guild, get_images_by_user, get_image_by_id
+from database import get_tags, get_image_by_message, get_images_by_guild, get_images_by_user, get_image_by_id, search_by_multiple_tags
 from embeddings import embed_text, embed_image, cosine_similarity_batch
 from views import ImagePaginator
 from helpers import download_image
+from query_parser import parse_search_query
 
 async def find_similar_context_callback(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.defer(ephemeral=False)
@@ -98,8 +99,8 @@ class Search(commands.Cog):
 
         return results
 
-    @app_commands.command(name="search", description="Search images by text description")
-    @app_commands.describe(query="Describe what you want to find")
+    @app_commands.command(name="search", description="Search images by text description with optional filters")
+    @app_commands.describe(query="Describe what to find. Use char:Name, series:Name, #tag, or \"name\" for metadata filters")
     async def search(self, interaction: discord.Interaction, query: str):
         await interaction.response.defer()
         guild_id = interaction.guild_id
@@ -108,27 +109,81 @@ class Search(commands.Cog):
             await interaction.followup.send("❌ No images indexed yet. Upload some art first!", ephemeral=True)
             return
 
-        try:
-            q_emb = await embed_text(query)
-        except Exception as e:
-            logger.error(f"Text embed error: {e}")
-            await interaction.followup.send("❌ Failed to process search query.", ephemeral=True)
-            return
+        parsed = parse_search_query(query)
+        logger.info(
+            f"Search parsed: semantic='{parsed['semantic_query']}' "
+            f"tags={parsed['tags']} tag_likes={parsed['tag_likes']}"
+        )
 
-        if q_emb is None:
-            await interaction.followup.send("❌ Failed to embed search query.", ephemeral=True)
-            return
+        # Collect results from tag matching
+        tag_results = []
+        if parsed['tags'] or parsed['tag_likes']:
+            tag_results = await search_by_multiple_tags(guild_id, parsed['tags'], parsed['tag_likes'], limit=TOP_K_SEARCH)
 
-        results = self._search_index(guild_id, q_emb)
+        # Collect results from semantic search
+        semantic_results = []
+        semantic_query = parsed['semantic_query']
+        if semantic_query:
+            try:
+                q_emb = await embed_text(semantic_query)
+            except Exception as e:
+                logger.error(f"Text embed error: {e}")
+                await interaction.followup.send("❌ Failed to process search query.", ephemeral=True)
+                return
+
+            if q_emb is None:
+                await interaction.followup.send("❌ Failed to embed search query.", ephemeral=True)
+                return
+
+            semantic_raw = self._search_index(guild_id, q_emb)
+            for r in semantic_raw:
+                r['_source'] = 'semantic'
+                semantic_results.append(r)
+
+        # Merge results: tag matches first, then semantic results (deduplicated)
+        seen_ids = set()
+        results = []
+
+        for r in tag_results:
+            if r['id'] not in seen_ids:
+                r['_source'] = 'tag'
+                r['_score'] = 1.0
+                seen_ids.add(r['id'])
+                results.append(r)
+
+        for r in semantic_results:
+            if r['id'] not in seen_ids:
+                seen_ids.add(r['id'])
+                results.append(r)
+            else:
+                # Boost score for results that appear in both
+                for existing in results:
+                    if existing['id'] == r['id']:
+                        existing['score'] = max(existing.get('score', 0), r.get('score', 0)) + 0.3
+                        existing['_source'] = 'tag+semantic'
+                        break
+
+        # If no semantic query but we have tags, use tag results as-is
+        if not semantic_query and (parsed['tags'] or parsed['tag_likes']):
+            results = tag_results[:TOP_K_SEARCH]
+            for r in results:
+                r['score'] = 1.0
+                r['_source'] = 'tag'
+
+        # If neither produced results
         if not results:
             await interaction.followup.send("❌ No matching images found.", ephemeral=True)
             return
 
         # Attach tags to results
-        for r in results:
+        for r in results[:TOP_K_SEARCH]:
             r['tags'] = await get_tags(r['id'])
 
-        paginator = ImagePaginator(results, query_info=f"Search: {query}", author_id=interaction.user.id, guild_id=guild_id)
+        query_info = f"Search: {query}"
+        if parsed['tags']:
+            query_info += f" | Tags: {', '.join(parsed['tags'])}"
+
+        paginator = ImagePaginator(results[:TOP_K_SEARCH], query_info=query_info, author_id=interaction.user.id, guild_id=guild_id)
         await paginator.send(interaction)
 
     @app_commands.command(name="searchbyimage", description="Upload an image to find similar ones")

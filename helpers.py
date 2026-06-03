@@ -1,6 +1,8 @@
 import asyncio
 import aiohttp
 import time
+import re
+import os
 from io import BytesIO
 from PIL import Image
 from typing import Optional, Dict
@@ -56,7 +58,7 @@ async def download_image(url: str) -> Optional[dict]:
             logger.error(f"Download error: {e}")
     return None
 
-def generate_auto_tags(width: int, height: int, fmt: str, size_mb: float) -> list:
+def generate_auto_tags(width: int, height: int, fmt: str, size_mb: float, filename: str = None, message_content: str = None) -> list:
     tags = []
     if fmt:
         tags.append(f"format:{fmt.lower()}")
@@ -84,5 +86,55 @@ def generate_auto_tags(width: int, height: int, fmt: str, size_mb: float) -> lis
             tags.append("resolution:wallpaper")
         elif width < 256 and height < 256:
             tags.append("resolution:icon")
+
+    # Extract metadata tags from filename
+    if filename:
+        name = os.path.splitext(filename)[0]
+        # Split on underscores and spaces first
+        parts = re.split(r'[_\s]+', name)
+        extracted = set()
+
+        GENERIC_WORDS = {
+            'img', 'image', 'pic', 'photo', 'screen', 'shot', 'screenshot',
+            'output', 'untitled', 'draft', 'art', 'artwork', 'drawing',
+            'sketch', 'render', 'final', 'version', 'edit', 'copy', 'file',
+            'download', 'export', 'capture', 'clip', 'snap', 'frame',
+        }
+
+        for part in parts:
+            part = part.strip()
+            if not part or len(part) <= 1 or part.isdigit():
+                continue
+            lower = part.lower()
+            if lower in GENERIC_WORDS:
+                continue
+
+            # If hyphenated, keep the full compound name (e.g. Jin-Woo)
+            if '-' in part:
+                full_name = re.sub(r'[^\w\-]', '', lower)
+                if len(full_name) >= 3:
+                    extracted.add(f"char:{full_name}")
+
+            # Split CamelCase (BlueFlowers -> blue, flowers)
+            words = re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\b)', part)
+            if not words:
+                words = [lower]
+
+            for w in words:
+                w = w.lower().strip()
+                if len(w) >= 3 and w not in GENERIC_WORDS:
+                    extracted.add(f"char:{w}")
+
+        tags.extend(sorted(extracted))
+
+    # Extract metadata tags from message content
+    if message_content:
+        content = message_content.strip()
+        # char:Name, series:Name, artist:Name, genre:Name patterns
+        prefix_re = re.compile(r'\b(char|series|artist|genre):(\S+)', re.IGNORECASE)
+        for prefix, value in prefix_re.findall(content):
+            tag = f"{prefix.lower()}:{value.lower().strip(',.;:')}"
+            if tag not in tags:
+                tags.append(tag)
 
     return tags

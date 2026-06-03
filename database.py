@@ -304,6 +304,50 @@ async def search_by_tag(guild_id: int, tag: str, limit: int = 100):
         logger.error(f"Tag search error: {e}")
         return []
 
+async def search_by_multiple_tags(guild_id: int, tags: list, tag_likes: list = None, limit: int = 200):
+    """Search images matching any of the given tags or tag substrings."""
+    try:
+        rows = []
+        if not tags and not tag_likes:
+            return rows
+
+        async with db_pool.acquire() as db:
+            if tags:
+                placeholders = ','.join('?' for _ in tags)
+                tag_params = [tag.lower() for tag in tags]
+                async with db.execute(f'''
+                    SELECT DISTINCT i.* FROM images i
+                    JOIN tags t ON i.id = t.image_id
+                    WHERE i.guild_id = ? AND t.tag COLLATE NOCASE IN ({placeholders})
+                    ORDER BY i.id DESC LIMIT ?
+                ''', (guild_id, *tag_params, limit)) as cur:
+                    async for row in cur:
+                        rows.append(dict(row))
+
+            if tag_likes and len(rows) < limit:
+                remaining = limit - len(rows)
+                seen_ids = {r['id'] for r in rows}
+                for like in tag_likes:
+                    if len(rows) >= limit:
+                        break
+                    async with db.execute('''
+                        SELECT DISTINCT i.* FROM images i
+                        JOIN tags t ON i.id = t.image_id
+                        WHERE i.guild_id = ? AND t.tag LIKE ? COLLATE NOCASE
+                        ORDER BY i.id DESC LIMIT ?
+                    ''', (guild_id, f'%{like}%', remaining)) as cur:
+                        async for row in cur:
+                            d = dict(row)
+                            if d['id'] not in seen_ids:
+                                seen_ids.add(d['id'])
+                                rows.append(d)
+
+        return rows
+    except Exception as e:
+        logger.error(f"Multi-tag search error: {e}")
+        return []
+
+
 async def delete_guild_data(guild_id: int):
     try:
         async with db_pool.acquire() as db:

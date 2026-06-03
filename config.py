@@ -11,9 +11,6 @@ logging.basicConfig(
 logger = logging.getLogger('ArtBot')
 
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-EMBED_API_URL = os.getenv('EMBED_API_URL')
-EMBED_API_KEY = os.getenv('API_KEY')
-USE_EMBED_API = bool(EMBED_API_URL and EMBED_API_KEY)
 
 DATA_DIR = 'bot_data'
 DB_FILE = os.path.join(DATA_DIR, 'artbot.db')

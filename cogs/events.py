@@ -142,7 +142,7 @@ class Events(commands.Cog):
             )
 
             if img_id > 0:
-                auto_tags = generate_auto_tags(dl['width'], dl['height'], dl['format'], dl['size_mb'])
+                auto_tags = generate_auto_tags(dl['width'], dl['height'], dl['format'], dl['size_mb'], att.filename, message.content)
                 for t in auto_tags:
                     await add_tag(img_id, t)
 
