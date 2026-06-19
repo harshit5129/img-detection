@@ -1,52 +1,39 @@
-import discord
-from discord.ext import commands
 import asyncio
-import sys
+import discord
+from bot import create_bot
 from config import TOKEN, logger
+from database import db_pool, save_guild_config
 
-intents = discord.Intents.default()
-intents.message_content = True
-intents.guilds = True
-intents.members = True
-intents.reactions = True
-
-bot = commands.Bot(command_prefix='!', intents=intents)
-
-@bot.event
-async def setup_hook():
-    await bot.load_extension('cogs.events')
-    await bot.load_extension('cogs.commands')
-
-async def shutdown():
-    """Graceful shutdown"""
+async def shutdown(bot):
     logger.info("Shutting down...")
-    
-    from database import save_guild_data, db_pool
+    for gid in list(bot.cogs.keys()):
+        cog = bot.get_cog(gid)
+        if cog and hasattr(cog, 'auto_save') and cog.auto_save.is_running():
+            cog.auto_save.cancel()
+
     from config import guild_data
-    
-    # Save all guild data
     for gid in list(guild_data.keys()):
-        await save_guild_data(gid)
-    
-    # Close DB pool
+        await save_guild_config(gid)
+
     await db_pool.close_all()
-    
     logger.info("Shutdown complete")
 
 def main():
-    if not TOKEN:
-        logger.error("No token found! Check your .env file.")
-        return
-    
+    bot = create_bot()
+    logger.info("=" * 60)
+    logger.info("🚀 Art Gallery Bot with Semantic Search")
+    logger.info("=" * 60)
+
     try:
         bot.run(TOKEN)
     except discord.LoginFailure:
-        logger.error("Invalid token!")
+        logger.error("❌ Invalid token. Check DISCORD_BOT_TOKEN.")
     except KeyboardInterrupt:
-        asyncio.run(shutdown())
+        logger.info("Interrupted by user")
+        asyncio.run(shutdown(bot))
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
-        asyncio.run(shutdown())
+        logger.error(f"Fatal: {e}")
+        asyncio.run(shutdown(bot))
 
 if __name__ == "__main__":
     main()
